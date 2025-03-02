@@ -5,7 +5,6 @@
 #include <rsa.h>
 #include <sha.h>
 #include <osrng.h>
-#include <pem.h>
 #include <hex.h>
 #include <base64.h>
 #include <iostream>

@@ -33,10 +33,13 @@ build_test_raft:
     -Ivendor/cadmium_v2/include \
     -Ivendor/googletest/googletest/include \
     -Ivendor/googletest/googlemock/include \
+    -Ivendor/cryptopp \
     models/test/raft_test.cpp \
+    utils/cryptography/crypto.cpp \
+    utils/stochastic/random.cpp \
     vendor/googletest/lib/libgtest.a \
     vendor/googletest/lib/libgtest_main.a \
+    vendor/cryptopp/libcryptopp.a \
     -o bin/test_raft \
     -pthread
-
 
