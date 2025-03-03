@@ -82,6 +82,7 @@
         "stdfloat": "cpp",
         "cinttypes": "cpp",
         "strstream": "cpp",
-        "*.ipp": "cpp"
+        "*.ipp": "cpp",
+        "queue": "cpp"
     }
 }

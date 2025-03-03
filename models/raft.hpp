@@ -152,7 +152,7 @@ public:
             // Make RaftMessage
             std::shared_ptr<RaftMessage> raftMessage = std::make_shared<RaftMessage>(requestMessage);
             // Push it to the ouput port
-            s.raftOutMessages.push_back(raftMessage);
+            s.raftOutMessages.emplace_back(raftMessage);
         }
     }
 
@@ -187,13 +187,14 @@ public:
     
 
     void output(const RaftState& s) const override {
+
         // Perform the Database messages first, Independent
-        for (const auto& message : s.databaseOutMessages) {
+        for (auto& message : s.databaseOutMessages) {
             output_database->addMessage(message);  // Copy shared pointer
         }
     
         // Perform the OutRaft messages second
-        for (const auto& message : s.raftOutMessages) {
+        for (auto& message : s.raftOutMessages) {
             output_external->addMessage(message);
         }
     }
@@ -248,13 +249,13 @@ void HandleRequest(RaftState& s, std::shared_ptr<RequestVote> requestMessage) co
     std::shared_ptr<RaftMessage> raftMessage =  std::make_shared<RaftMessage>(response);
 
     // Push to output message queue
-    s.raftOutMessages.push_back(raftMessage);
+    s.raftOutMessages.emplace_back(raftMessage);
 }
 
     void HandleResponse(RaftState& s, std::shared_ptr<ResponseVote> responseMessage) const {
         // Checks if response is a valid. 
         if (responseMessage -> metadata.voteGranted == true) {
-            s.tempMessageStorage.push_back(responseMessage);
+            s.tempMessageStorage.emplace_back(responseMessage);
         } 
     };
 
@@ -292,11 +293,11 @@ void HandleRequest(RaftState& s, std::shared_ptr<RequestVote> requestMessage) co
         s.commitIndex = std::min(appendEntriesMessage -> metadata.leaderCommit, static_cast<int>(s.messageLog.size()) - 1);
     }
     
-    void HandleRAFTEntry(RaftState& s, const std::shared_ptr<LogEntryRAFT>& logEntryRaft, const std::string& leaderID) const {
+    void HandleRAFTEntry(RaftState& s, const std::shared_ptr<LogEntryRAFT> logEntryRaft, const std::string& leaderID) const {
         // Verify the RAFT entry before committing it
         if (ValidateRAFTEntry(s, logEntryRaft)) {
             // If the entry is valid, commit to the log
-            s.messageLog.push_back(logEntryRaft);  // Or handle it according to your log structure
+            s.messageLog.emplace_back(logEntryRaft);  // Or handle it according to your log structure
     
             // Update the leader if the entry is valid and the leader has changed
             s.leaderID = leaderID;
@@ -313,13 +314,13 @@ void HandleRequest(RaftState& s, std::shared_ptr<RequestVote> requestMessage) co
             return;
         }
         // Commit message
-        s.messageLog.push_back(logEntryHeartbeat); 
+        s.messageLog.emplace_back(logEntryHeartbeat); 
         // Set new heartbeat time
         s.heartbeatTimeout = s.currentTime + RandomNumberGeneratorDEVS::generateUniformDelay(0.150,0.300);
 
     }
     
-    bool ValidateRAFTEntry(const RaftState& s, const std::shared_ptr<LogEntryRAFT>& logEntryRaft) const {
+    bool ValidateRAFTEntry(const RaftState& s, const std::shared_ptr<LogEntryRAFT> logEntryRaft) const {
         // Perform validation checks for the RAFT entry (e.g., verify signature, content, etc.)
         // Assume is valid for this experimental frame
         int voteCountRequirement = (s.peers.size() / 2) + 1;
@@ -359,8 +360,8 @@ void HandleRequest(RaftState& s, std::shared_ptr<RequestVote> requestMessage) co
                 };
     
                 // Create log entries
-                entriesVector.push_back(std::make_shared<LogEntryHeartbeat>(metadataHeartbeat));
-                entriesVector.push_back(std::make_shared<LogEntryRAFT>());                              
+                entriesVector.emplace_back(std::make_shared<LogEntryHeartbeat>(metadataHeartbeat));
+                entriesVector.emplace_back(std::make_shared<LogEntryRAFT>());                              
     
                 // Send the AppendEntries message
                 SendAppendEntries(s, entriesVector);  
@@ -388,7 +389,7 @@ void HandleRequest(RaftState& s, std::shared_ptr<RequestVote> requestMessage) co
     
         // Create Raft message and add it to the output message queue
         std::shared_ptr<RaftMessage> raftMessage =  std::make_shared<RaftMessage>(appendEntriesMsg);
-        s.raftOutMessages.push_back(raftMessage);
+        s.raftOutMessages.emplace_back(raftMessage);
     }
     
 

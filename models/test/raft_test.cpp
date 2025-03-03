@@ -301,18 +301,9 @@ TEST(RaftTest, OutputMethodProcessesMessagesCorrectly) {
     raftMock.InitModel();
 
     // Create some test messages (assuming these are valid types)
-
-    auto appendEntriesMsg = std::make_shared<RaftMessage>(std::make_shared<AppendEntries>());
-    auto requestVoteMsg = std::make_shared<RaftMessage>(std::make_shared<RequestVote>());
-    auto responseVoteMsg = std::make_shared<RaftMessage>(std::make_shared<ResponseVote>());
-
-    // Create copies of the shared_ptrs and add them to raftOutMessages
-    raftMock.state.raftOutMessages.emplace_back(appendEntriesMsg);
-    raftMock.state.raftOutMessages.emplace_back(requestVoteMsg);
-    raftMock.state.raftOutMessages.emplace_back(responseVoteMsg);
-
-    // Call the output method
-    raftMock.model->output(raftMock.state);
+    raftMock.state.raftOutMessages.emplace_back(std::make_shared<RaftMessage>(std::make_shared<AppendEntries>()));
+    raftMock.state.raftOutMessages.emplace_back(std::make_shared<RaftMessage>(std::make_shared<RequestVote>()));
+    raftMock.state.raftOutMessages.emplace_back(std::make_shared<RaftMessage>(std::make_shared<ResponseVote>()));
 
     // Call the output method
     raftMock.model -> output(raftMock.state);
