@@ -8,8 +8,8 @@ enum class Task {VOTE_REQUEST, APPEND_ENTRIES, VOTE_RESPONSE};
 
 class RaftMessage {
     public:
-        RaftMessage(BaseMessageContentInterface<Task>& _content) : content(_content) {};
-        BaseMessageContentInterface<Task>& content;
+        explicit RaftMessage(std::shared_ptr<BaseMessageContentInterface<Task>> _content) : content(std::move(_content)) {}
+        std::shared_ptr<BaseMessageContentInterface<Task>> content;
 };
 
 struct RequestMetadata {
@@ -104,8 +104,16 @@ class ResponseVote : public BaseMessageContentInterface<Task> {
 
 enum class LogEntryType {RAFT, HEARTBEAT, EXTERNAL};
 
+
+struct logEntryMetadata {
+    RequestVote requestMessage;
+    std::vector<ResponseVote> messageList;
+};
+
 class LogEntryRAFT : public BaseMessageContentInterface<LogEntryType>  {
     public:
+        logEntryMetadata metadata;
+        LogEntryRAFT(logEntryMetadata _metadata) : metadata(_metadata) {};
         LogEntryRAFT() = default;
         BaseMessageContentInterface<LogEntryType>& getContent() override { 
             return *this; 
@@ -164,7 +172,7 @@ class LogEntryExternal : public BaseMessageContentInterface<LogEntryType>  {
 
 struct AppendEntriesMetadata  {
     int term;          // Leader's current term
-    std::string leaderId; // The ID of the leader
+    std::string leaderID; // The ID of the leader
     int prevLogIndex;  // Index of log entry preceding the new entries
     int prevLogTerm;   // Term of the log entry at PrevLogIndex
     std::vector<std::shared_ptr<BaseMessageContentInterface<LogEntryType>>> entries; // List of log entries to be replicated (empty for heartbeat)
@@ -175,13 +183,13 @@ struct AppendEntriesMetadata  {
         std::stringstream ss;
         ss << "AppendEntriesMetadata { "
         << "term: " << term << ", "
-        << "leaderId: \"" << leaderId << "\", "
+        << "leaderId: \"" << leaderID << "\", "
         << "prevLogIndex: " << prevLogIndex << ", "
         << "prevLogTerm: " << prevLogTerm << ", "
         << "entries: [";
         
         for (size_t i = 0; i < entries.size(); ++i) {
-            ss << entries[i] -> toString();
+            ss << entries[i]->toString();
             if (i < entries.size() - 1) ss << ", ";
         }
 
@@ -196,7 +204,7 @@ struct AppendEntriesMetadata  {
 class AppendEntries : public BaseMessageContentInterface<Task> {
     public:
         AppendEntries() = default;
-        AppendEntries(  AppendEntriesMetadata _metadata, std::string _msgDigestSigned) : metadata(_metadata), msgDigestSigned(_msgDigestSigned) {};
+        AppendEntries(AppendEntriesMetadata _metadata, std::string _msgDigestSigned) : metadata(_metadata), msgDigestSigned(_msgDigestSigned) {};
         AppendEntriesMetadata metadata;
         std::string msgDigestSigned;
 

@@ -7,7 +7,9 @@
 enum class DatabaseTask {INSERT, QUERY};
 
 struct DatabaseMessage {
-    BaseMessageContentInterface<DatabaseTask>& content;
+    explicit DatabaseMessage(std::shared_ptr<BaseMessageContentInterface<DatabaseTask>> _content) : content(std::move(_content)) {}
+    DatabaseMessage() = default;
+    std::shared_ptr<BaseMessageContentInterface<DatabaseTask>> content;
 };
 
 class InsertMetadata {

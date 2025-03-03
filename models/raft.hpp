@@ -47,23 +47,25 @@ std::ostream& operator<<(std::ostream& os, VoteStatus status) {
 }
 
 struct RaftState {
+    RaftState() : heartbeatTimeout(RandomNumberGeneratorDEVS::generateUniformDelay(0.150,0.300)) {};
+
+
     RaftStatus state = RaftStatus::FOLLOWER;  // Current state of the node (FOLLOWER, CANDIDATE, LEADER)
     int currentTerm = 0;  // Current term of the node
-    VoteStatus votedFor = VoteStatus::VOTE_NOT_YET_SUBMITTED;  // Vote status for the current term
+    VoteStatus votedStatus = VoteStatus::VOTE_NOT_YET_SUBMITTED;  // Vote status for the current term
     int commitIndex = 0;  // The index of the highest log entry known to be committed
     int lastApplied = 0;  // The index of the last applied entry (to the state machine)
-    int heartbeatTimeout = 0;  // Timeout for heartbeat messages
+    double heartbeatTimeout = 0.0;  // Timeout for heartbeat messages
     double currentTime = 0.0;  // Current time (used for heartbeat and election timeouts)
-    std::string voteRequestId;  // Request ID for the current vote request
     std::string privateKey;  // Node's private key for signing messages
     std::vector<std::string> publicKeys;  // List of public keys of other nodes for signature verification
-    std::unordered_map<int, std::unordered_map<std::string, std::vector<ResponseVote>>> messageLog;  // Log of responses from other nodes
-    std::vector<DatabaseMessage> databaseOutMessages;  // Outgoing database messages (e.g., queries or inserts)
-    std::vector<RaftMessage> raftOutMessages;  // Outgoing Raft messages (e.g., AppendEntries)
-    int numOfPeers = 0;  // Total number of peers in the cluster (including this node)
+    std::vector<std::shared_ptr<BaseMessageContentInterface<LogEntryType>>> messageLog; // Log of responses from other nodes
+    std::vector<std::shared_ptr<ResponseVote>> tempMessageStorage; 
+    std::vector<std::shared_ptr<DatabaseMessage>> databaseOutMessages;  // Outgoing database messages (e.g., queries or inserts)
+    std::vector<std::shared_ptr<RaftMessage>> raftOutMessages;  // Outgoing Raft messages (e.g., AppendEntries)
+    std::vector<std::string> peers;  // Total number of peers in the cluster (including this node)
     int logIndex = 0;  // Current index of the last log entry
     int electionTimeout = 0;  // Timeout for triggering a new election
-    int votesReceived = 0;  // Number of votes received in the current election
     std::string leaderID;
 };
 
@@ -72,11 +74,10 @@ std::ostream& operator<<(std::ostream& os, const RaftState& state) {
     os << "RaftState { "
        << "state: " << state.state << ", "
        << "currentTerm: " << state.currentTerm << ", "
-       << "votedFor: " << state.votedFor << ", "
+       << "votedStatus: " << state.votedStatus << ", "
        << "commitIndex: " << state.commitIndex << ", "
        << "heartbeatTimeout: " << state.heartbeatTimeout << ", "
        << "currentTime: " << state.currentTime << ", "
-       << "voteRequestId: \"" << state.voteRequestId << "\", "
        << "privateKey: \"" << state.privateKey << "\", "
        << "publicKeys: [";
     
@@ -86,24 +87,47 @@ std::ostream& operator<<(std::ostream& os, const RaftState& state) {
     }
 
     os << "], "
-       << "numOfPeers: " << state.numOfPeers << ", "
+       << "numOfPeers: " << state.peers.size() << ", "
        << "logIndex: " << state.logIndex
        << " }";
     
     return os;
 }
 
-template <typename MessageRaft, typename MessageDatabase, typename MessageConsensus>
+
 class RaftModel : public Atomic<RaftState> {
 public:
 
-    Port<MessageRaft> input_buffer;
-    Port<MessageDatabase> output_database;
-    Port<MessageRaft> output_external;
+    Port<std::shared_ptr<RaftMessage>> input_buffer;
+    Port<std::shared_ptr<DatabaseMessage>> output_database;
+    Port<std::shared_ptr<RaftMessage>> output_external;
 
     RaftState state {};
 
     RaftModel(const std::string& id) : Atomic<RaftState>(id, {}) {}
+
+    // Function to calculate processing delay for AppendEntries messages
+    double processAppendEntries(const std::shared_ptr<RaftMessage> msg) const {
+        size_t numEntries = std::static_pointer_cast<AppendEntries>(msg->content) -> metadata.entries.size();
+        double lambda = 0.1;  // Lambda is the rate (1/mean), adjust as needed for your system
+        double baseDelay = 0.5;  // Base processing time for each entry, you can fine-tune this
+        return numEntries * RandomNumberGeneratorDEVS::generateExponentialDelay(lambda) * baseDelay;
+    }
+
+    // Function to calculate processing delay for VoteRequest messages
+    double processVoteRequest() const {
+        double lambda = 0.2;  // Lambda for vote request delays (tune to your needs)
+        double baseDelay = 0.1;  // Base delay for vote requests
+        return RandomNumberGeneratorDEVS::generateExponentialDelay(lambda) * baseDelay;
+    }
+
+    // Function to calculate processing delay for ResponseVote messages
+    double processResponseVote() const {
+        double lambda = 0.3;  // Lambda for response vote delays
+        double baseDelay = 0.05;  // Base delay for response votes
+        return RandomNumberGeneratorDEVS::generateExponentialDelay(lambda) * baseDelay;
+    }
+
 
     void internalTransition(RaftState& s) const override { 
         // Check if we had a TIMEOUT by not receiving a HeartBEAT message
@@ -111,8 +135,10 @@ public:
             // Set ourselves as a candidate
             s.state = RaftStatus::CANDIDATE;
             s.currentTerm = state.currentTerm + 1;
-            s.voteRequestId = "request-term-"+ std::to_string(s.currentTerm) + "-" + id;
             s.heartbeatTimeout = s.currentTime + 0.1; // Add random generation 
+            s.votedStatus = VoteStatus::VOTE_SUBMITTED; // Self vote
+            // Clear the temp message store 
+            s.tempMessageStorage.clear();
             // Make a requestVote
             RequestMetadata requestMetadata = {
                 s.currentTerm,
@@ -122,35 +148,33 @@ public:
             // Hash + Sign it
             std::string msgDigestSigned = Crypto::SignData(requestMetadata.toString(), s.privateKey);
             // Append to response
-            RequestVote requestMessage = {
-                requestMetadata,
-                msgDigestSigned
-            };
-
-            MessageRaft raftMessage = {
-                requestMessage
-            };
+            std::shared_ptr<RequestVote> requestMessage = std::make_shared<RequestVote>(requestMetadata, msgDigestSigned);
+            // Make RaftMessage
+            std::shared_ptr<RaftMessage> raftMessage = std::make_shared<RaftMessage>(requestMessage);
             // Push it to the ouput port
-            s.raftOutMessages.push(raftMessage);
+            s.raftOutMessages.push_back(raftMessage);
         }
     }
 
     void externalTransition(RaftState& s, double e) const override {
         // Update time
         s.currentTime += e;
+        // Flush message vectors
+        s.databaseOutMessages.clear();
+        s.raftOutMessages.clear();
 
-        std::vector<MessageRaft> msgs_buffer = input_buffer -> getBag();
+        std::vector<std::shared_ptr<RaftMessage>> msgs_buffer = input_buffer -> getBag();
         for (auto& msgRaft : msgs_buffer) {
-                switch (msgRaft.content.getType())
+                switch (msgRaft -> content -> getType())
                 {
                 case Task::VOTE_REQUEST:
-                    HandleRequest(s, static_cast<RequestVote&>(msgRaft.content));
+                    HandleRequest(s, std::static_pointer_cast<RequestVote>(msgRaft -> content));
                     break;
                 case Task::VOTE_RESPONSE:
-                    HandleResponse(s, static_cast<ResponseVote&>(msgRaft.content));
+                    HandleResponse(s, std::static_pointer_cast<ResponseVote>(msgRaft -> content));
                     break;
                 case Task::APPEND_ENTRIES:
-                    HandleAppendEntries(s, static_cast<AppendEntries&>(msgRaft.content));
+                    HandleAppendEntries(s, std::static_pointer_cast<AppendEntries>(msgRaft -> content));
                     break;
                 default:
                     break;
@@ -162,58 +186,54 @@ public:
     }
     
 
-    void output(RaftState& s) const override {
-        // Perform the Database messages first, Independent 
-        while (!s.databaseOutMessages.empty()) {
-            output_database->addMessage(s.databaseOutMessages.top());
-            s.databaseOutMessages.pop();
+    void output(const RaftState& s) const override {
+        // Perform the Database messages first, Independent
+        for (const auto& message : s.databaseOutMessages) {
+            output_database->addMessage(message);  // Copy shared pointer
         }
     
         // Perform the OutRaft messages second
-        while (!s.raftOutMessages.empty()) {
-            output_external->addMessage(s.raftOutMessages.top());
-            s.raftOutMessages.pop();
+        for (const auto& message : s.raftOutMessages) {
+            output_external->addMessage(message);
         }
     }
-    
 
-    double timeAdvance(RaftState& s) const override {
+
+    double timeAdvance(const RaftState& s) const override {
         double totalProcessingTime = 0.0;  // Initialize the total processing time accumulator
     
         // Loop through raftOutMessages queue and calculate delays based on message types
         for (auto& msg : s.raftOutMessages) {
-            switch (msg.getType()) {
+            switch (msg -> content -> getType()) {
                 case Task::APPEND_ENTRIES:
                     totalProcessingTime += processAppendEntries(msg);
                     break;
                 case Task::VOTE_REQUEST:
-                    totalProcessingTime += processVoteRequest(msg);
+                    totalProcessingTime += processVoteRequest();
                     break;
                 case Task::VOTE_RESPONSE:
-                    totalProcessingTime += processResponseVote(msg);
+                    totalProcessingTime += processResponseVote();
                     break;
                 default:
                     break;
             }
         }
 
-        // Add total delay to current time and return it
-        s.currentTime += totalProcessingTime;
-        return s.currentTime;
+        return totalProcessingTime;
     }
 
 
-void HandleRequest(RaftState& s, RequestVote& requestMessage) const {
-    bool largerThanCurrentTerm = (requestMessage.metadata.termNumber > s.currentTerm);
-    bool equalButNotVoted = (requestMessage.metadata.termNumber == s.currentTerm) && (s.votedFor == VoteStatus::VOTE_NOT_YET_SUBMITTED);
+void HandleRequest(RaftState& s, std::shared_ptr<RequestVote> requestMessage) const {
+    bool largerThanCurrentTerm = (requestMessage -> metadata.termNumber > s.currentTerm);
+    bool equalButNotVoted = (requestMessage -> metadata.termNumber == s.currentTerm) && (s.votedStatus == VoteStatus::VOTE_NOT_YET_SUBMITTED);
 
     ResponseMetadata responseMetadata;
     bool voteGranted = largerThanCurrentTerm || equalButNotVoted;
 
     responseMetadata = {
-        requestMessage.metadata.termNumber,
-        requestMessage.metadata.candidateID,
-        requestMessage.metadata.lastLogIndex,
+        requestMessage -> metadata.termNumber,
+        requestMessage -> metadata.candidateID,
+        requestMessage -> metadata.lastLogIndex,
         voteGranted,
         id
     };
@@ -222,40 +242,40 @@ void HandleRequest(RaftState& s, RequestVote& requestMessage) const {
     std::string msgDigestSigned = Crypto::SignData(responseMetadata.toString(), s.privateKey);
     
     // Append to response
-    ResponseVote response = { responseMetadata, msgDigestSigned };
+    std::shared_ptr<ResponseVote> response = std::make_shared<ResponseVote>(responseMetadata, msgDigestSigned);
 
     // Create Raft Message
-    MessageRaft raftMessage { response };
+    std::shared_ptr<RaftMessage> raftMessage =  std::make_shared<RaftMessage>(response);
 
     // Push to output message queue
-    s.raftOutMessages.push(raftMessage);
+    s.raftOutMessages.push_back(raftMessage);
 }
 
-    void HandleResponse(RaftState& s, ResponseVote& responseMessage) const {
+    void HandleResponse(RaftState& s, std::shared_ptr<ResponseVote> responseMessage) const {
         // Checks if response is a valid. 
-        if (responseMessage.metadata.voteGranted == true) {
-            s.messageLog[responseMessage.metadata.termNumber][s.voteRequestId].push_back(responseMessage);
+        if (responseMessage -> metadata.voteGranted == true) {
+            s.tempMessageStorage.push_back(responseMessage);
         } 
     };
 
-    void HandleAppendEntries(RaftState& s, AppendEntries& appendEntriesMessage) const {
+    void HandleAppendEntries(RaftState& s, std::shared_ptr<AppendEntries> appendEntriesMessage) const {
         // Ignore stale terms (leader must have a higher term)
-        if (appendEntriesMessage.metadata.term < s.currentTerm) {
+        if (appendEntriesMessage -> metadata.term < s.currentTerm) {
             return;
         }
     
         // Loop through the entries
-        for (const auto& logEntry : appendEntriesMessage.metadata.entries) {
+        for (auto& logEntry : appendEntriesMessage -> metadata.entries) {
             // Update leader information if the term is valid
-            switch (logEntry.getType()) {
+            switch (logEntry -> getType()) {
                 case LogEntryType::RAFT:
                     // Loop through the messages (verify them, set leader if valid, and commit to log)
-                    HandleRAFTEntry(s, logEntry, appendEntriesMessage.metadata.leaderId);
+                    HandleRAFTEntry(s, std::static_pointer_cast<LogEntryRAFT>(logEntry), appendEntriesMessage -> metadata.leaderID);
                     break;
     
                 case LogEntryType::HEARTBEAT:
                     // Verify leader is valid and update log with heartbeat metadata
-                    HandleHeartbeat(s, appendEntriesMessage.metadata.leaderID);
+                    HandleHeartbeatEntry(s, std::static_pointer_cast<LogEntryHeartbeat>(logEntry), appendEntriesMessage -> metadata.leaderID);
                     break;
     
                 case LogEntryType::EXTERNAL:
@@ -267,22 +287,16 @@ void HandleRequest(RaftState& s, RequestVote& requestMessage) const {
                     break;
             }
         }
-    
-        // Remove conflicting log entries
-        s.log.resize(appendEntriesMessage.metadata.prevLogIndex + 1);
-    
-        // Append new entries from the message
-        s.log.insert(s.log.end(), appendEntriesMessage.metadata.entries.begin(), appendEntriesMessage.metadata.entries.end());
-    
-        // Update commit index: Ensure we don't commit unreplicated entries
-        s.commitIndex = std::min(appendEntriesMessage.metadata.leaderCommit, static_cast<int>(s.log.size()) - 1);
+
+        // Update commit index
+        s.commitIndex = std::min(appendEntriesMessage -> metadata.leaderCommit, static_cast<int>(s.messageLog.size()) - 1);
     }
     
-    void HandleRAFTEntry(RaftState& s, const std::shared_ptr<BaseMessageContentInterface<LogEntryType>>& logEntry, const std::string& leaderID) const {
+    void HandleRAFTEntry(RaftState& s, const std::shared_ptr<LogEntryRAFT>& logEntryRaft, const std::string& leaderID) const {
         // Verify the RAFT entry before committing it
-        if (ValidateRAFTEntry(logEntry)) {
+        if (ValidateRAFTEntry(s, logEntryRaft)) {
             // If the entry is valid, commit to the log
-            s.log.push_back(logEntry);  // Or handle it according to your log structure
+            s.messageLog.push_back(logEntryRaft);  // Or handle it according to your log structure
     
             // Update the leader if the entry is valid and the leader has changed
             s.leaderID = leaderID;
@@ -292,34 +306,42 @@ void HandleRequest(RaftState& s, RequestVote& requestMessage) const {
         }
     }
     
-    void HandleHeartbeat(RaftState& s, const std::string& leaderID) const {
+    void HandleHeartbeatEntry(RaftState& s, const std::shared_ptr<LogEntryHeartbeat> logEntryHeartbeat, const std::string& leaderID) const {
         // Verify that the leader is valid
         if (s.leaderID != leaderID) {
             std::cerr << "Heartbeat received from an invalid leader: " << leaderID << std::endl;
             return;
         }
-    
-        // Commit the heartbeat metadata to the log 
+        // Commit message
+        s.messageLog.push_back(logEntryHeartbeat); 
         // Set new heartbeat time
         s.heartbeatTimeout = s.currentTime + RandomNumberGeneratorDEVS::generateUniformDelay(0.150,0.300);
 
     }
     
-    bool ValidateRAFTEntry(const std::shared_ptr<BaseMessageContentInterface<LogEntryType>>& entry) const {
+    bool ValidateRAFTEntry(const RaftState& s, const std::shared_ptr<LogEntryRAFT>& logEntryRaft) const {
         // Perform validation checks for the RAFT entry (e.g., verify signature, content, etc.)
         // Assume is valid for this experimental frame
-        bool isValid = true;
-        return isValid;
+        int voteCountRequirement = (s.peers.size() / 2) + 1;
+
+        // Validate signatures, from peers -- implement in later project
+        // Validate request from leader
+        int acc = 0;
+        for (const auto& message : logEntryRaft -> metadata.messageList) {
+            if (message.metadata.voteGranted == true){
+                acc++;
+            }
+        }
+        return acc >= voteCountRequirement;
     }
-    
     
     
     void CheckAndTransitionToLeader(RaftState& s) const {
         // If the node is a candidate, check if it has enough votes
         if (s.state == RaftStatus::CANDIDATE) {
-            // Calculate the required number of votes (2f+1), assuming s.numOfPeers includes itself
-            int voteCountRequirement = (s.numOfPeers / 2) + 1;
-            int votesReceived = s.messageLog[s.currentTerm][s.voteRequestId].size();
+            // Calculate the required number of votes (2f+1)
+            int voteCountRequirement = (s.peers.size() / 2) + 1;
+            int votesReceived = s.tempMessageStorage.size();
     
             // If enough votes have been received, transition to leader
             if (votesReceived >= voteCountRequirement) {
@@ -331,14 +353,14 @@ void HandleRequest(RaftState& s, RequestVote& requestMessage) const {
                 // Heartbeat metadata
                 HeartbeatMetadata metadataHeartbeat = {
                     id,                // Leader ID
-                    0,                 // Sequence number (should be incremented if necessary)
+                    s.logIndex,       // Sequence number (should be incremented if necessary)
                     s.currentTime,  // Timestamp (if required)
                     HEARTBEAT_STATUS::PING
                 };
     
                 // Create log entries
                 entriesVector.push_back(std::make_shared<LogEntryHeartbeat>(metadataHeartbeat));
-                entriesVector.push_back(std::make_shared<LogEntryRAFT>());
+                entriesVector.push_back(std::make_shared<LogEntryRAFT>());                              
     
                 // Send the AppendEntries message
                 SendAppendEntries(s, entriesVector);  
@@ -361,40 +383,16 @@ void HandleRequest(RaftState& s, RequestVote& requestMessage) const {
         std::string msgDigestSigned = Crypto::SignData(appendEntriesMetadata.toString(), s.privateKey);
     
         // Create append entries message with signature
-        AppendEntries appendEntriesMsg = {
-            appendEntriesMetadata,
-            msgDigestSigned
-        };
+        std::shared_ptr<AppendEntries> appendEntriesMsg = std::make_shared<AppendEntries>(appendEntriesMetadata, msgDigestSigned);
+
     
         // Create Raft message and add it to the output message queue
-        MessageRaft raftMessage { appendEntriesMsg };
-        s.raftOutMessages.push(raftMessage);
+        std::shared_ptr<RaftMessage> raftMessage =  std::make_shared<RaftMessage>(appendEntriesMsg);
+        s.raftOutMessages.push_back(raftMessage);
     }
     
 
 };
-
-// Function to calculate processing delay for AppendEntries messages
-double processAppendEntries(const RaftMessage& msg) {
-    size_t numEntries = static_cast<AppendEntries>(msg.content).metadata.entries.size();
-    double lambda = 0.1;  // Lambda is the rate (1/mean), adjust as needed for your system
-    double baseDelay = 0.5;  // Base processing time for each entry, you can fine-tune this
-    return numEntries * RandomNumberGeneratorDEVS::generateExponentialDelay(lambda) * baseDelay;
-}
-
-// Function to calculate processing delay for VoteRequest messages
-double processVoteRequest() {
-    double lambda = 0.2;  // Lambda for vote request delays (tune to your needs)
-    double baseDelay = 0.1;  // Base delay for vote requests
-    return RandomNumberGeneratorDEVS::generateExponentialDelay(lambda) * baseDelay;
-}
-
-// Function to calculate processing delay for ResponseVote messages
-double processResponseVote() {
-    double lambda = 0.3;  // Lambda for response vote delays
-    double baseDelay = 0.05;  // Base delay for response votes
-    return RandomNumberGeneratorDEVS::generateExponentialDelay(lambda) * baseDelay;
-}
 
 
 #endif
