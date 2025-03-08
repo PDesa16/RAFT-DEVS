@@ -7,8 +7,8 @@
 enum class DatabaseTask {INSERT, QUERY};
 
 struct DatabaseMessage {
-    explicit DatabaseMessage(std::shared_ptr<BaseMessageContentInterface<DatabaseTask>> _content) : content(std::move(_content)) {}
-    std::shared_ptr<BaseMessageContentInterface<DatabaseTask>> content;
+    explicit DatabaseMessage(std::shared_ptr<IMessage<DatabaseTask>> _content) : content(std::move(_content)) {}
+    std::shared_ptr<IMessage<DatabaseTask>> content;
 };
 
 class InsertMetadata {
@@ -37,24 +37,24 @@ class QueryMetadata {
             void setSourceIDFilter(int id) { sourceIDFilter = id; }
 };
 
-class InsertDatabase : BaseMessageContentInterface<DatabaseTask> {
+class InsertDatabase : IMessage<DatabaseTask> {
     InsertMetadata metadata;
 
-    BaseMessageContentInterface<DatabaseTask>& getContent() override { 
-        return *this; 
-    }
+    // IMessage<DatabaseTask>& getContent() override { 
+    //     return *this; 
+    // }
 
     DatabaseTask getType() override {
         return DatabaseTask::INSERT;
     }
 };
 
-class QueryDatabase : BaseMessageContentInterface<DatabaseTask> {
+class QueryDatabase : IMessage<DatabaseTask> {
     QueryMetadata metadata;
 
-    BaseMessageContentInterface<DatabaseTask>& getContent() override { 
-        return *this; 
-    }
+    // IMessage<DatabaseTask>& getContent() override { 
+    //     return *this; 
+    // }
 
     DatabaseTask getType() override {
         return DatabaseTask::QUERY;

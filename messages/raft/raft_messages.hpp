@@ -8,9 +8,12 @@ enum class Task {VOTE_REQUEST, APPEND_ENTRIES, VOTE_RESPONSE};
 
 class RaftMessage {
     public:
-        explicit RaftMessage(std::shared_ptr<BaseMessageContentInterface<Task>> _content) : content(std::move(_content)) {}
-        std::shared_ptr<BaseMessageContentInterface<Task>> content;
+        explicit RaftMessage(std::shared_ptr<IMessage<Task>> _content) : content(std::move(_content)) {}
+        std::shared_ptr<IMessage<Task>> content;
 };
+
+
+
 
 struct RequestMetadata {
     int termNumber;
@@ -28,17 +31,14 @@ struct RequestMetadata {
     }
 };
 
-class RequestVote : public BaseMessageContentInterface<Task> {
+class RequestVote : public IMessage<Task> {
     public:
         RequestVote() = default;
-        RequestVote(RequestMetadata _metadata, std::string _msgDigestSigned) : metadata(_metadata), msgDigestSigned(_msgDigestSigned) {};
+        RequestVote(RequestMetadata _metadata, std::string_view _msgDigestSigned) : metadata(_metadata), msgDigestSigned(_msgDigestSigned) {};
 
         RequestMetadata metadata;
         std::string msgDigestSigned;
 
-        BaseMessageContentInterface<Task>& getContent() override { 
-            return *this; 
-        }
 
         Task getType() override {
             return Task::VOTE_REQUEST;
@@ -62,31 +62,24 @@ struct ResponseMetadata {
     std::string nodeId;
 
     // Method to return a string representation of the struct
-    std::string toString() const  {
+    std::string toString() const  
+    {
         std::stringstream ss;
-        ss << "ResponseMetadata { "
-           << "termNumber: " << termNumber << ", "
-           << "votedFor: \"" << votedFor << "\", "
-           << "lastLogIndex: " << lastLogIndex << ", "
-           << "voteGranted: " << (voteGranted ? "true" : "false") << ", "
-           << "nodeId: \"" << nodeId << "\" "
-           << "}";
+        ss << "ResponseMetadata { " << "termNumber: "  << termNumber << ", " << "votedFor: \"" << votedFor << "\", "
+           << "lastLogIndex: " << lastLogIndex << ", " << "voteGranted: " << (voteGranted ? "true" : "false") << ", " 
+           << "nodeId: \"" << nodeId << "\" "  << "}";
         return ss.str();
     }
 };
 
 
-class ResponseVote : public BaseMessageContentInterface<Task> {
+class ResponseVote : public IMessage<Task>  {
     public:
         ResponseVote()  = default;
         ResponseVote(ResponseMetadata _metadata, std::string _msgDigestSigned) : metadata(_metadata), msgDigestSigned(_msgDigestSigned) {};
         
         ResponseMetadata metadata;
         std::string msgDigestSigned;
-
-        BaseMessageContentInterface<Task>& getContent() override { 
-            return *this; 
-        }
 
         Task getType() override {
             return Task::VOTE_RESPONSE;
@@ -110,38 +103,34 @@ struct logEntryMetadata {
     std::vector<ResponseVote> messageList;
 };
 
-class LogEntryRAFT : public BaseMessageContentInterface<LogEntryType>  {
-    public:
-        logEntryMetadata metadata;
-        LogEntryRAFT(logEntryMetadata _metadata) : metadata(_metadata) {};
-        LogEntryRAFT() = default;
-        BaseMessageContentInterface<LogEntryType>& getContent() override { 
-            return *this; 
-        }
+class LogEntryRAFT : public  IMessage<LogEntryType>  
+{
+public:
+    LogEntryRAFT() = default;
+    LogEntryRAFT(logEntryMetadata _metadata) : metadata(_metadata) {};
 
-        LogEntryType getType() override {
-            return LogEntryType::RAFT;
-        }
+    logEntryMetadata metadata;
 
-        std::string toString() const override {
+    LogEntryType getType() override { return LogEntryType::RAFT; }
+
+    std::string toString() const override 
+    {
         std::stringstream ss;
-        ss << "LogEntryRAFT : {" 
-        << "}";
+        ss << "LogEntryRAFT : {" << "}";
         return ss.str();
-        }
+    }
 };
 
-class LogEntryHeartbeat : public BaseMessageContentInterface<LogEntryType> {
+class LogEntryHeartbeat : public IMessage<LogEntryType> {
     public:
-
         LogEntryHeartbeat() = default;
         LogEntryHeartbeat(HeartbeatMetadata _metadata) : metadata(_metadata) {};
 
         HeartbeatMetadata metadata;  
 
-        BaseMessageContentInterface<LogEntryType>& getContent() override { 
-            return *this; 
-        }
+        // IMessage<LogEntryType>& getContent() override { 
+        //     return *this; 
+        // }
 
         // Overriding getType to return the heartbeat log entry type
         LogEntryType getType() override {
@@ -150,20 +139,16 @@ class LogEntryHeartbeat : public BaseMessageContentInterface<LogEntryType> {
 
         // Convert the heartbeat log entry to a string suitable for the database
         std::string toString() const override {
-        std::stringstream ss;
-        ss << "LogEntryHeartbeat - Type: HEARTBEAT, Metadata: {" 
-        << this->metadata.toString() << "}";
-        return ss.str();
+            std::stringstream ss;
+            ss << "LogEntryHeartbeat - Type: HEARTBEAT, Metadata: {" << metadata.toString() << "}";
+            return ss.str();
         }
 };
 
 
-class LogEntryExternal : public BaseMessageContentInterface<LogEntryType>  { 
+class LogEntryExternal : public IMessage<LogEntryType>  { 
     public:
         LogEntryExternal() = default;
-        BaseMessageContentInterface<LogEntryType>& getContent() override { 
-            return *this; 
-        }
 
         LogEntryType getType() override {
             return LogEntryType::EXTERNAL;
@@ -175,42 +160,33 @@ struct AppendEntriesMetadata  {
     std::string leaderID; // The ID of the leader
     int prevLogIndex;  // Index of log entry preceding the new entries
     int prevLogTerm;   // Term of the log entry at PrevLogIndex
-    std::vector<std::shared_ptr<BaseMessageContentInterface<LogEntryType>>> entries; // List of log entries to be replicated (empty for heartbeat)
+    std::vector<std::shared_ptr<IMessage<LogEntryType>>> entries; // List of log entries to be replicated (empty for heartbeat)
     int leaderCommit;  // The index of the highest log entry known to be committed
 
 
     std::string toString() const {
         std::stringstream ss;
-        ss << "AppendEntriesMetadata { "
-        << "term: " << term << ", "
-        << "leaderId: \"" << leaderID << "\", "
-        << "prevLogIndex: " << prevLogIndex << ", "
-        << "prevLogTerm: " << prevLogTerm << ", "
-        << "entries: [";
+        ss << "AppendEntriesMetadata { " << "term: " << term << ", " << "leaderId: \"" << leaderID << "\", "
+        << "prevLogIndex: " << prevLogIndex << ", "  << "prevLogTerm: " << prevLogTerm << ", " << "entries: [";
         
         for (size_t i = 0; i < entries.size(); ++i) {
             ss << entries[i]->toString();
             if (i < entries.size() - 1) ss << ", ";
         }
 
-        ss << "], "
-        << "leaderCommit: " << leaderCommit
-        << " }";
+        ss << "], " << "leaderCommit: " << leaderCommit << " }";
         return ss.str();
     }
 
 };
 
-class AppendEntries : public BaseMessageContentInterface<Task> {
+class AppendEntries : public IMessage<Task> {
     public:
         AppendEntries() = default;
-        AppendEntries(AppendEntriesMetadata _metadata, std::string _msgDigestSigned) : metadata(_metadata), msgDigestSigned(_msgDigestSigned) {};
+        AppendEntries(AppendEntriesMetadata _metadata, std::string_view _msgDigestSigned) : metadata(_metadata), msgDigestSigned(_msgDigestSigned) {};
         AppendEntriesMetadata metadata;
         std::string msgDigestSigned;
 
-        BaseMessageContentInterface<Task>& getContent() override { 
-            return *this; 
-        }
 
         Task getType() override {
             return Task::APPEND_ENTRIES;
@@ -218,8 +194,7 @@ class AppendEntries : public BaseMessageContentInterface<Task> {
         
         std::string toString() const override {
             std::stringstream ss;
-            ss << "AppendEntries {" << metadata.toString() << "msgDigestSigned: "
-            << msgDigestSigned << "}";
+            ss << "AppendEntries {" << metadata.toString() << "msgDigestSigned: " << msgDigestSigned << "}";
             return ss.str();
         }
 };
