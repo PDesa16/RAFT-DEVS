@@ -13,11 +13,11 @@ mkdir -p "$BUILD_DIR"
 
 # Fetch dependencies
 cd "$BUILD_DIR"
-git clone https://github.com/SimulationEverywhere/cadmium_v2.git
-git clone https://github.com/weidai11/cryptopp.git
-git clone https://github.com/google/googletest.git
-git clone https://github.com/nlohmann/json.git
-git clone https://github.com/jbeder/yaml-cpp.git
+# git clone https://github.com/SimulationEverywhere/cadmium_v2.git
+# git clone https://github.com/weidai11/cryptopp.git
+# git clone https://github.com/google/googletest.git
+# git clone https://github.com/nlohmann/json.git
+# git clone https://github.com/jbeder/yaml-cpp.git
 
 # Build dependencies
 cd "$BUILD_DIR/cadmium_v2"
