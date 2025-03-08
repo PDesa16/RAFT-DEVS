@@ -59,7 +59,7 @@ struct RaftState {
     double currentTime = 0.0;  // Current time (used for heartbeat and election timeouts)
     std::string privateKey;  // Node's private key for signing messages
     std::vector<std::string> publicKeys;  // List of public keys of other nodes for signature verification
-    std::vector<std::shared_ptr<BaseMessageContentInterface<LogEntryType>>> messageLog; // Log of responses from other nodes
+    std::vector<std::shared_ptr<IMessage<LogEntryType>>> messageLog; // Log of responses from other nodes
     std::vector<std::shared_ptr<ResponseVote>> tempMessageStorage; 
     std::vector<std::shared_ptr<DatabaseMessage>> databaseOutMessages;  // Outgoing database messages (e.g., queries or inserts)
     std::vector<std::shared_ptr<RaftMessage>> raftOutMessages;  // Outgoing Raft messages (e.g., AppendEntries)
@@ -97,14 +97,17 @@ std::ostream& operator<<(std::ostream& os, const RaftState& state) {
 
 class RaftModel : public Atomic<RaftState> {
 public:
-
     Port<std::shared_ptr<RaftMessage>> input_buffer;
     Port<std::shared_ptr<DatabaseMessage>> output_database;
     Port<std::shared_ptr<RaftMessage>> output_external;
 
     RaftState state {};
 
-    RaftModel(const std::string& id) : Atomic<RaftState>(id, {}) {}
+    RaftModel(const std::string& id)
+        : Atomic<RaftState>(id, {}),
+          input_buffer(std::make_shared<_Port<std::shared_ptr<RaftMessage>>>("input_buffer")),
+          output_database(std::make_shared<_Port<std::shared_ptr<DatabaseMessage>>>("output_database")),
+          output_external(std::make_shared<_Port<std::shared_ptr<RaftMessage>>>("output_external")) {}
 
     // Function to calculate processing delay for AppendEntries messages
     double processAppendEntries(const std::shared_ptr<RaftMessage> msg) const {
@@ -349,7 +352,7 @@ void HandleRequest(RaftState& s, std::shared_ptr<RequestVote> requestMessage) co
                 s.state = RaftStatus::LEADER;
     
                 // Prepare heartbeat log entries
-                std::vector<std::shared_ptr<BaseMessageContentInterface<LogEntryType>>> entriesVector;
+                std::vector<std::shared_ptr<IMessage<LogEntryType>>> entriesVector;
     
                 // Heartbeat metadata
                 HeartbeatMetadata metadataHeartbeat = {
@@ -369,7 +372,7 @@ void HandleRequest(RaftState& s, std::shared_ptr<RequestVote> requestMessage) co
         }
     }
     
-    void SendAppendEntries(RaftState& s, std::vector<std::shared_ptr<BaseMessageContentInterface<LogEntryType>>> entries) const {
+    void SendAppendEntries(RaftState& s, std::vector<std::shared_ptr<IMessage<LogEntryType>>> entries) const {
         // Prepare append entries metadata
         AppendEntriesMetadata appendEntriesMetadata = {
             s.currentTerm,   // Leader's term
