@@ -6,10 +6,27 @@
 
 enum class Task {VOTE_REQUEST, APPEND_ENTRIES, VOTE_RESPONSE};
 
-class RaftMessage {
+class RaftMessage : public IMessage<PacketPayloadType> {
     public:
-        explicit RaftMessage(std::shared_ptr<IMessage<Task>> _content) : content(std::move(_content)) {}
+        RaftMessage(std::shared_ptr<IMessage<Task>> _content) : content(std::move(_content)) {}
+        RaftMessage() : content(nullptr) {}
         std::shared_ptr<IMessage<Task>> content;
+        std::string source ="";
+        std::string dest = "";
+
+        PacketPayloadType getType() override {
+            return PacketPayloadType::RAFT;
+        };
+
+        std::string toString() const override {
+            return "RAFT MESSAGE";
+        };
+
+        friend std::ostream& operator<<(std::ostream& os, const RaftMessage& msg) {
+            os << "RaftMessage";
+            return os;
+        }
+        
 };
 
 

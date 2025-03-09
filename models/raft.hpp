@@ -67,32 +67,32 @@ struct RaftState {
     int logIndex = 0;  // Current index of the last log entry
     int electionTimeout = 0;  // Timeout for triggering a new election
     std::string leaderID;
+
+    friend std::ostream& operator<<(std::ostream& os, const RaftState& state) {
+        os << "RaftState { "
+           << "state: " << state.state << ", "
+           << "currentTerm: " << state.currentTerm << ", "
+           << "votedStatus: " << state.votedStatus << ", "
+           << "commitIndex: " << state.commitIndex << ", "
+           << "heartbeatTimeout: " << state.heartbeatTimeout << ", "
+           << "currentTime: " << state.currentTime << ", "
+           << "privateKey: \"" << state.privateKey << "\", "
+           << "publicKeys: [";
+        
+        for (size_t i = 0; i < state.publicKeys.size(); ++i) {
+            os << "\"" << state.publicKeys[i] << "\"";
+            if (i < state.publicKeys.size() - 1) os << ", ";
+        }
+    
+        os << "], "
+           << "numOfPeers: " << state.peers.size() << ", "
+           << "logIndex: " << state.logIndex
+           << " }";
+        
+        return os;
+    }
 };
 
-// Define the output stream operator for RaftState
-std::ostream& operator<<(std::ostream& os, const RaftState& state) {
-    os << "RaftState { "
-       << "state: " << state.state << ", "
-       << "currentTerm: " << state.currentTerm << ", "
-       << "votedStatus: " << state.votedStatus << ", "
-       << "commitIndex: " << state.commitIndex << ", "
-       << "heartbeatTimeout: " << state.heartbeatTimeout << ", "
-       << "currentTime: " << state.currentTime << ", "
-       << "privateKey: \"" << state.privateKey << "\", "
-       << "publicKeys: [";
-    
-    for (size_t i = 0; i < state.publicKeys.size(); ++i) {
-        os << "\"" << state.publicKeys[i] << "\"";
-        if (i < state.publicKeys.size() - 1) os << ", ";
-    }
-
-    os << "], "
-       << "numOfPeers: " << state.peers.size() << ", "
-       << "logIndex: " << state.logIndex
-       << " }";
-    
-    return os;
-}
 
 
 class RaftModel : public Atomic<RaftState> {
@@ -102,12 +102,14 @@ public:
     Port<std::shared_ptr<RaftMessage>> output_external;
 
     RaftState state {};
-
+    
     RaftModel(const std::string& id)
-        : Atomic<RaftState>(id, {}),
-          input_buffer(std::make_shared<_Port<std::shared_ptr<RaftMessage>>>("input_buffer")),
-          output_database(std::make_shared<_Port<std::shared_ptr<DatabaseMessage>>>("output_database")),
-          output_external(std::make_shared<_Port<std::shared_ptr<RaftMessage>>>("output_external")) {}
+    : Atomic<RaftState>(id, {}) {
+    input_buffer = addInPort<std::shared_ptr<RaftMessage>>("input_buffer");
+    output_database = addOutPort<std::shared_ptr<DatabaseMessage>>("output_database");
+    output_external = addOutPort<std::shared_ptr<RaftMessage>>("output_external");
+    }
+
 
     // Function to calculate processing delay for AppendEntries messages
     double processAppendEntries(const std::shared_ptr<RaftMessage> msg) const {

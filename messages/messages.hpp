@@ -1,6 +1,9 @@
 #ifndef MESSAGES_HPP
 #define MESSAGES_HPP
 
+
+enum class PacketPayloadType {RAFT}; // Add type here later..
+
 template <typename ContentTask>
 class IMessage 
 {

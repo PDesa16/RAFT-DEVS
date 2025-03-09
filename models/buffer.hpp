@@ -5,6 +5,7 @@
 #include <queue>
 #include <string>
 #include <vector>
+#include "../utils/stochastic/random.hpp"
 
 
 using namespace cadmium;
@@ -12,23 +13,12 @@ using namespace cadmium;
 // State struct
 template <typename MessageType>
 struct BufferState {
-    std::queue<MessageType> buffer;
+    std::queue<std::shared_ptr<MessageType>> buffer;
     bool busy = false;
 
     // Overload operator<< for BufferState, allows us to log state in a cleaner way
     friend std::ostream& operator<<(std::ostream& os, const BufferState<MessageType>& state) {
         os << "BufferState: {busy: " << (state.busy ? "true" : "false") << ", messages: [";
-        
-        // Iterate through the message queue
-        std::queue<std::string> copy = state.buffer;  // Make a copy to avoid modifying the original
-        while (!copy.empty()) {
-            os << copy.front();
-            copy.pop();
-            if (!copy.empty()) {
-                os << ", ";
-            }
-        }
-
         os << "] }";
         return os;
     }
@@ -41,10 +31,15 @@ template <typename MessageType>
 // Buffer Atomic Model
 class Buffer : public Atomic<BufferState<MessageType>> {
 public:
-    Port<MessageType> in_port;
-    Port<MessageType> out_port;
+    Port<std::shared_ptr<MessageType>> input_port;
+    Port<std::shared_ptr<MessageType>> output_port;
 
-    Buffer(const std::string& id) : Atomic<BufferState<MessageType>>(id, {}) {}
+
+    Buffer(const std::string& id) : Atomic<BufferState<MessageType>>(id, {}) {
+        input_port = cadmium::Component::addInPort<std::shared_ptr<MessageType>>("input_buffer");
+        output_port = cadmium::Component::addOutPort<std::shared_ptr<MessageType>>("output_buffer");
+    }
+    
 
     void internalTransition(BufferState<MessageType>& s) const override {
         if (!s.buffer.empty()) {
@@ -54,8 +49,8 @@ public:
     }
 
     void externalTransition(BufferState<MessageType>& s, double e) const override {
-        while (!in_port -> empty()) {
-            std::vector<MessageType> msgs = in_port -> getBag();
+        while (!input_port -> empty()) {
+            std::vector<std::shared_ptr<MessageType>> msgs = input_port -> getBag();
             for (auto msg : msgs) {
                 s.buffer.push(msg);
             }
@@ -65,7 +60,7 @@ public:
 
     void output(const BufferState<MessageType>& s) const override {
         if (!s.buffer.empty()) {
-            out_port -> addMessage(s.buffer.front());
+            output_port -> addMessage(s.buffer.front());
         }
     }
 
@@ -74,7 +69,8 @@ public:
     }
 
     double getProcessingDelay() const {
-        return 0.05;
+        // Keeping it static for now for simplicity 
+        return 0.00000001;
     }
 
 };
