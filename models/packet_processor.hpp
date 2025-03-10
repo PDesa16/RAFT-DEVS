@@ -61,7 +61,6 @@ public:
     // Output: forward the current message after the delay
     void output(const PacketProcessorState& s) const override {
         if (!s.packetQueue.empty()) {
-            std::cout << "Forwarding message: " << s.packetQueue.top() -> packet ;
             auto message = s.packetQueue.top() -> packet -> payload;
             switch (message -> getType()) {
                 case PacketPayloadType::RAFT:

@@ -1,11 +1,11 @@
 #include <gtest/gtest.h>
-#include "../buffer_raft.hpp"
+#include "../raft.hpp"
 
 
-class BufferRaftAtomicFixture: public ::testing::Test
+class RaftFixture: public ::testing::Test
 {
 protected:
-    std::unique_ptr<BufferRaftModel> model;
+    std::unique_ptr<RaftModel> model;
 
     void SetUp() override 
     {
@@ -15,14 +15,14 @@ protected:
     void InitModel() 
     {
         model.reset();
-        model = std::make_unique<BufferRaftModel>("buffer-raft");
+        model = std::make_unique<RaftModel>("buffer-raft");
     }
 
 };
 
 
 // Test Model
-TEST_F(BufferRaftAtomicFixture, testBuildBufferRaftCoupledModel) {
+TEST_F(RaftFixture, testBuildBufferRaftCoupledModel) {
     std::cout << "test";
     ASSERT_TRUE(model != nullptr);
 }

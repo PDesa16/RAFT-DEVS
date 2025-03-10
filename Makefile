@@ -135,3 +135,35 @@ build_simulation:
     vendor/cryptopp/libcryptopp.a \
     -o bin/test_simulation \
     -pthread
+
+
+build_heartbeat_controller:
+	g++ -Wall -g --std=c++17 \
+    -Ivendor/cadmium_v2/include \
+    -Ivendor/googletest/googletest/include \
+    -Ivendor/googletest/googlemock/include \
+    -Ivendor/cryptopp \
+    models/test/heartbeat_controller_test.cpp \
+    utils/cryptography/crypto.cpp \
+    utils/stochastic/random.cpp \
+    vendor/googletest/lib/libgtest.a \
+    vendor/googletest/lib/libgtest_main.a \
+    vendor/cryptopp/libcryptopp.a \
+    -o bin/test_simulation \
+    -pthread
+
+
+build_raft:
+	g++ -Wall -g --std=c++17 \
+    -Ivendor/cadmium_v2/include \
+    -Ivendor/googletest/googletest/include \
+    -Ivendor/googletest/googlemock/include \
+    -Ivendor/cryptopp \
+    models/coupled/test/raft_test.cpp \
+    utils/cryptography/crypto.cpp \
+    utils/stochastic/random.cpp \
+    vendor/googletest/lib/libgtest.a \
+    vendor/googletest/lib/libgtest_main.a \
+    vendor/cryptopp/libcryptopp.a \
+    -o bin/test_simulation \
+    -pthread

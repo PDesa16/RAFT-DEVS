@@ -49,11 +49,9 @@ public:
     }
 
     void externalTransition(BufferState<MessageType>& s, double e) const override {
-        while (!input_port -> empty()) {
-            std::vector<std::shared_ptr<MessageType>> msgs = input_port -> getBag();
-            for (auto msg : msgs) {
-                s.buffer.push(msg);
-            }
+        std::vector<std::shared_ptr<MessageType>> msgs = input_port -> getBag();
+        for (auto msg : msgs) {
+            s.buffer.push(msg);
         }
         s.busy = true;
     }

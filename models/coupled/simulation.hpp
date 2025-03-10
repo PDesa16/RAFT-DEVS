@@ -4,31 +4,50 @@
 #include <cadmium/core/modeling/coupled.hpp>
 #include "node.hpp"
 #include "../network.hpp"
+#include <unordered_map>
 
 
 
 using namespace cadmium;
+
 
 class SimulationModel : public Coupled {
 public:
 
     explicit SimulationModel(const std::string& id) : Coupled(id) {
 
-        //  No external ports
 
-        // Create instances of atomic models
-        auto node0 = addComponent<NodeModel>("node0");
-        auto node1 = addComponent<NodeModel>("node1");
-        auto network = addComponent<NetworkModel>("network");
+        std::vector<std::string> nodesID;
+        std::unordered_map<std::string, std::shared_ptr<NodeModel>> nodes;
+        
 
-        auto test = node0 -> getOutPort("output_external");
-        // auto test2 = network -> getInPort("in_packet") ;
+        for (int i = 0 ; i < 3; i++){
+            auto nodeID = "node" + std::to_string(i);
+            nodesID.push_back(nodeID); 
+            nodes[nodeID] = addComponent<NodeModel>(nodeID);
+        }
 
-        // Define couplings
-        addCoupling(network -> getOutPort("out_packet"), node0 -> getInPort("external_input")); // Internal Coupling (IC)
-        addCoupling(node0 -> getOutPort("output_external"), network -> getInPort("in_packet")); // Internal Coupling (IC)
 
-    }
+        auto network = addComponent<NetworkModel>("network", nodesID);
+
+        for (auto nodeID : nodesID) {
+            auto raftChild = nodes[nodeID] -> getComponent("raft");
+            auto raftChildController = std::dynamic_pointer_cast<RaftModel>(raftChild) -> getComponent("raft-controller");
+            std::vector<std::string> peers;
+            // Copy all elements except `nodeID`
+            std::copy_if(nodesID.begin(), nodesID.end(), std::back_inserter(peers), 
+                         [nodeID](const std::string& x) { return x != nodeID; });
+            
+            // Pass `peers` to setPeers()
+            std::dynamic_pointer_cast<RaftControllerModel>(raftChildController)->setPeers(peers);
+            
+
+            addCoupling(network -> getOutPort("output_packet_"+ nodeID), nodes[nodeID] -> getInPort("external_input")); // Internal Coupling (IC)
+            addCoupling(nodes[nodeID] -> getOutPort("output_external"), network -> getInPort("input_packet_" + nodeID)); // Internal Coupling (IC)
+        }
+
+    };
+
 };
 
 #endif

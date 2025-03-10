@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 #include "../simulation.hpp"
+#include <cadmium/core/simulation/root_coordinator.hpp>
 
 
 class SimulationFixture: public ::testing::Test
@@ -24,8 +25,14 @@ protected:
 
 // Test Model
 TEST_F(SimulationFixture, testBuildBufferRaftCoupledModel) {
-    std::cout << "test";
+    // Create a RootCoordinator to manage the simulation
+    // Instantiate the top-level coupled model
+    auto model = std::make_shared<SimulationModel>("simulation");
+    RootCoordinator root(model);
+    // Set the simulation time limit (e.g., 1000 time units)
+    root.simulate(0.3);
     ASSERT_TRUE(model != nullptr);
+
 }
 
 

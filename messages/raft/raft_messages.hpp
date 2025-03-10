@@ -4,6 +4,15 @@
 #include "../messages.hpp"
 #include "../util/heartbeat_messages.hpp"
 
+enum class HeartbeatStatus {ALIVE, TIMEOUT, UPDATE, INIT};
+
+std::ostream& operator<<(std::ostream& os, HeartbeatStatus status) {
+    os << (status == HeartbeatStatus::ALIVE ? "ALIVE" : "TIMEOUT");
+    return os;
+}
+
+
+
 enum class Task {VOTE_REQUEST, APPEND_ENTRIES, VOTE_RESPONSE};
 
 class RaftMessage : public IMessage<PacketPayloadType> {
@@ -11,7 +20,7 @@ class RaftMessage : public IMessage<PacketPayloadType> {
         RaftMessage(std::shared_ptr<IMessage<Task>> _content) : content(std::move(_content)) {}
         RaftMessage() : content(nullptr) {}
         std::shared_ptr<IMessage<Task>> content;
-        std::string source ="";
+        std::string source = "";
         std::string dest = "";
 
         PacketPayloadType getType() override {
@@ -19,31 +28,33 @@ class RaftMessage : public IMessage<PacketPayloadType> {
         };
 
         std::string toString() const override {
-            return "RAFT MESSAGE";
+            std::stringstream ss;
+            ss << "RaftMessage { "
+               << "source: \"" << source << "\", "
+               << "dest: \"" << dest << "\", "
+               << "content: " << (content ? content->toString() : "null")
+               << " }";
+            return ss.str();
         };
 
         friend std::ostream& operator<<(std::ostream& os, const RaftMessage& msg) {
-            os << "RaftMessage";
+            os << msg.toString();
             return os;
         }
-        
 };
-
-
-
 
 struct RequestMetadata {
     int termNumber;
     std::string candidateID;
     int lastLogIndex;
 
-    std::string toString() const  {
+    std::string toString() const {
         std::stringstream ss;
         ss << "RequestMetadata { "
-           << "termNumber: " << std::to_string(termNumber) << ", "
+           << "termNumber: " << termNumber << ", "
            << "candidateID: \"" << candidateID << "\", "
-           << "lastLogIndex: " << std::to_string(lastLogIndex) << " "
-           << "}";
+           << "lastLogIndex: " << lastLogIndex
+           << " }";
         return ss.str();
     }
 };
@@ -56,17 +67,16 @@ class RequestVote : public IMessage<Task> {
         RequestMetadata metadata;
         std::string msgDigestSigned;
 
-
         Task getType() override {
             return Task::VOTE_REQUEST;
         }
 
         std::string toString() const override {
             std::stringstream ss;
-            ss << "RequestMetadata : {" 
-            << metadata.toString() << "msgDigestSigned: " <<
-            msgDigestSigned
-            << "}";
+            ss << "RequestVote { "
+               << "metadata: {" << metadata.toString() << "}, "
+               << "msgDigestSigned: \"" << msgDigestSigned << "\""
+               << " }";
             return ss.str();
         }
 };
@@ -78,50 +88,49 @@ struct ResponseMetadata {
     bool voteGranted;
     std::string nodeId;
 
-    // Method to return a string representation of the struct
-    std::string toString() const  
-    {
+    std::string toString() const {
         std::stringstream ss;
-        ss << "ResponseMetadata { " << "termNumber: "  << termNumber << ", " << "votedFor: \"" << votedFor << "\", "
-           << "lastLogIndex: " << lastLogIndex << ", " << "voteGranted: " << (voteGranted ? "true" : "false") << ", " 
-           << "nodeId: \"" << nodeId << "\" "  << "}";
+        ss << "ResponseMetadata { "
+           << "termNumber: " << termNumber << ", "
+           << "votedFor: \"" << votedFor << "\", "
+           << "lastLogIndex: " << lastLogIndex << ", "
+           << "voteGranted: " << (voteGranted ? "true" : "false") << ", "
+           << "nodeId: \"" << nodeId << "\""
+           << " }";
         return ss.str();
     }
 };
 
-
-class ResponseVote : public IMessage<Task>  {
+class ResponseVote : public IMessage<Task> {
     public:
         ResponseVote()  = default;
         ResponseVote(ResponseMetadata _metadata, std::string _msgDigestSigned) : metadata(_metadata), msgDigestSigned(_msgDigestSigned) {};
-        
+
         ResponseMetadata metadata;
         std::string msgDigestSigned;
 
         Task getType() override {
             return Task::VOTE_RESPONSE;
         }
+
         std::string toString() const override {
             std::stringstream ss;
-            ss << "ResponseVote : {" 
-            << metadata.toString() << "msgDigestSigned: " <<
-            msgDigestSigned
-            << "}";
+            ss << "ResponseVote { "
+               << "metadata: {" << metadata.toString() << "}, "
+               << "msgDigestSigned: \"" << msgDigestSigned << "\""
+               << " }";
             return ss.str();
         }
 };
 
-
 enum class LogEntryType {RAFT, HEARTBEAT, EXTERNAL};
-
 
 struct logEntryMetadata {
     RequestVote requestMessage;
     std::vector<ResponseVote> messageList;
 };
 
-class LogEntryRAFT : public  IMessage<LogEntryType>  
-{
+class LogEntryRAFT : public IMessage<LogEntryType> {
 public:
     LogEntryRAFT() = default;
     LogEntryRAFT(logEntryMetadata _metadata) : metadata(_metadata) {};
@@ -130,10 +139,15 @@ public:
 
     LogEntryType getType() override { return LogEntryType::RAFT; }
 
-    std::string toString() const override 
-    {
+    std::string toString() const override {
         std::stringstream ss;
-        ss << "LogEntryRAFT : {" << "}";
+        ss << "LogEntryRAFT { "
+           << "requestMessage: {" << metadata.requestMessage.toString() << "}, "
+           << "messageList: [";
+        for (const auto& msg : metadata.messageList) {
+            ss << msg.toString() << ", ";
+        }
+        ss << "] }";
         return ss.str();
     }
 };
@@ -143,25 +157,20 @@ class LogEntryHeartbeat : public IMessage<LogEntryType> {
         LogEntryHeartbeat() = default;
         LogEntryHeartbeat(HeartbeatMetadata _metadata) : metadata(_metadata) {};
 
-        HeartbeatMetadata metadata;  
+        HeartbeatMetadata metadata;
 
-        // IMessage<LogEntryType>& getContent() override { 
-        //     return *this; 
-        // }
-
-        // Overriding getType to return the heartbeat log entry type
         LogEntryType getType() override {
-            return LogEntryType::HEARTBEAT;  
+            return LogEntryType::HEARTBEAT;
         }
 
-        // Convert the heartbeat log entry to a string suitable for the database
         std::string toString() const override {
             std::stringstream ss;
-            ss << "LogEntryHeartbeat - Type: HEARTBEAT, Metadata: {" << metadata.toString() << "}";
+            ss << "LogEntryHeartbeat { "
+               << "metadata: {" << metadata.toString() << "}"
+               << " }";
             return ss.str();
         }
 };
-
 
 class LogEntryExternal : public IMessage<LogEntryType>  { 
     public:
@@ -170,9 +179,13 @@ class LogEntryExternal : public IMessage<LogEntryType>  {
         LogEntryType getType() override {
             return LogEntryType::EXTERNAL;
         }
+
+        std::string toString() const override {
+            return "LogEntryExternal { }";
+        }
 };
 
-struct AppendEntriesMetadata  {
+struct AppendEntriesMetadata {
     int term;          // Leader's current term
     std::string leaderID; // The ID of the leader
     int prevLogIndex;  // Index of log entry preceding the new entries
@@ -180,11 +193,14 @@ struct AppendEntriesMetadata  {
     std::vector<std::shared_ptr<IMessage<LogEntryType>>> entries; // List of log entries to be replicated (empty for heartbeat)
     int leaderCommit;  // The index of the highest log entry known to be committed
 
-
     std::string toString() const {
         std::stringstream ss;
-        ss << "AppendEntriesMetadata { " << "term: " << term << ", " << "leaderId: \"" << leaderID << "\", "
-        << "prevLogIndex: " << prevLogIndex << ", "  << "prevLogTerm: " << prevLogTerm << ", " << "entries: [";
+        ss << "AppendEntriesMetadata { "
+           << "term: " << term << ", "
+           << "leaderId: \"" << leaderID << "\", "
+           << "prevLogIndex: " << prevLogIndex << ", "
+           << "prevLogTerm: " << prevLogTerm << ", "
+           << "entries: [";
         
         for (size_t i = 0; i < entries.size(); ++i) {
             ss << entries[i]->toString();
@@ -194,7 +210,6 @@ struct AppendEntriesMetadata  {
         ss << "], " << "leaderCommit: " << leaderCommit << " }";
         return ss.str();
     }
-
 };
 
 class AppendEntries : public IMessage<Task> {
@@ -204,18 +219,18 @@ class AppendEntries : public IMessage<Task> {
         AppendEntriesMetadata metadata;
         std::string msgDigestSigned;
 
-
         Task getType() override {
             return Task::APPEND_ENTRIES;
         }
-        
+
         std::string toString() const override {
             std::stringstream ss;
-            ss << "AppendEntries {" << metadata.toString() << "msgDigestSigned: " << msgDigestSigned << "}";
+            ss << "AppendEntries { "
+               << "metadata: {" << metadata.toString() << "}, "
+               << "msgDigestSigned: \"" << msgDigestSigned << "\""
+               << " }";
             return ss.str();
         }
 };
 
-
-
-#endif 
+#endif
