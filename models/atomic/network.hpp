@@ -6,8 +6,8 @@
 #include <unordered_map>
 #include <string>
 #include <iostream>
-#include "../messages/network/network_message.hpp"
-#include "../utils/stochastic/random.hpp"
+#include "../../messages/network/network_message.hpp"
+#include "../../utils/stochastic/random.hpp"
 
 using namespace cadmium;
 
@@ -24,7 +24,6 @@ struct NetworkState {
     }
 
 };
-
 
 // Network Atomic Model
 class NetworkModel : public Atomic<NetworkState> {

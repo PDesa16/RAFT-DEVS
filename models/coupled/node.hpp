@@ -3,8 +3,8 @@
 
 #include <cadmium/core/modeling/coupled.hpp>
 #include "raft.hpp" 
-#include "../packet_processor.hpp"
-#include "../message_processor.hpp"
+#include "../atomic/packet_processor.hpp"
+#include "../atomic/message_processor.hpp"
 
 
 using namespace cadmium;

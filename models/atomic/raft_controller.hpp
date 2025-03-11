@@ -2,14 +2,14 @@
 #define RAFT_CONTROLLER_HPP
 
 #include <cadmium/core/modeling/atomic.hpp>
-#include "../messages/raft/raft_messages.hpp"
+#include "../../messages/raft/raft_messages.hpp"
 #include <queue>
 #include <string>
 #include <vector>
 #include <unordered_map>
-#include "../utils/cryptography/crypto.hpp"
-#include "../messages/database/database_messages.hpp"
-#include "../utils/stochastic/random.hpp"
+#include "../../utils/cryptography/crypto.hpp"
+#include "../../messages/database/database_messages.hpp"
+#include "../../utils/stochastic/random.hpp"
 
 using namespace cadmium;
 

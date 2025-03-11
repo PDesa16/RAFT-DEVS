@@ -3,7 +3,7 @@
 
 #include <cadmium/core/modeling/coupled.hpp>
 #include "node.hpp"
-#include "../network.hpp"
+#include "../atomic/network.hpp"
 #include <unordered_map>
 
 

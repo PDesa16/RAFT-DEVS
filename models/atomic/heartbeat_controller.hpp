@@ -5,8 +5,8 @@
 #include <iostream>
 #include <vector>
 #include <memory>
-#include "../utils/stochastic/random.hpp"
-#include "../messages/raft/raft_messages.hpp"
+#include "../../utils/stochastic/random.hpp"
+#include "../../messages/raft/raft_messages.hpp"
 
 using namespace cadmium;
 

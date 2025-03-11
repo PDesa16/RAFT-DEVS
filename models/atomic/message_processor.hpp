@@ -5,9 +5,9 @@
 #include <queue>
 #include <string>
 #include <iostream>
-#include "../messages/network/network_message.hpp"
-#include "../utils/stochastic/random.hpp"
-#include "../messages/raft/raft_messages.hpp"
+#include "../../messages/network/network_message.hpp"
+#include "../../utils/stochastic/random.hpp"
+#include "../../messages/raft/raft_messages.hpp"
 
 using namespace cadmium;
 

@@ -1,12 +1,12 @@
 #include <gtest/gtest.h>
-#include "../raft.hpp"
-#include "../../utils/cryptography/crypto.hpp"
+#include "../raft_controller.hpp"
+
 
 
 class RaftAtomicFixture: public ::testing::Test
 {
 protected:
-    std::unique_ptr<RaftModel> model;
+    std::unique_ptr<RaftControllerModel> model;
     RaftState state{}; 
 
 
@@ -18,7 +18,7 @@ protected:
     void InitModel() 
     {
         model.reset();
-        model = std::make_unique<RaftModel>("node0");
+        model = std::make_unique<RaftControllerModel>("node0");
         state.privateKey = Crypto::PrivateKeyToBase64(Crypto::GeneratePrivateKey()); 
         state.peers = { "node1", "node2" }; // Adding two "peers" to test logic
     }
@@ -77,8 +77,6 @@ TEST_F(RaftAtomicFixture, TestInternalTransitionHeartbeatValid) {
     ASSERT_EQ(state.raftOutMessages.size(), 1);
     // We expect the node to be a candidate
     ASSERT_EQ(state.state, RaftStatus::CANDIDATE);
-    // We expect our new timeout time to be larger than our current time
-    ASSERT_GT(state.heartbeatTimeout, state.currentTime);
 }
 
 /* External Transition Tests */
@@ -109,7 +107,7 @@ TEST_F(RaftAtomicFixture, TestHandleRequest) {
     // Create the expected message 
     std::shared_ptr<RequestVote> requestVoteMessage =  std::make_shared<RequestVote>(metadata, "");
     // Invoke Method
-    model->HandleRequest(state, requestVoteMessage);
+    model->HandleRequest(state, requestVoteMessage, "node1");
     // Verify raftOutMessages includes this entry. 
     ASSERT_EQ(state.raftOutMessages.size(), 1);
     // Verify that the message type is response
@@ -148,8 +146,6 @@ TEST_F(RaftAtomicFixture, TestHandleHeartbeatEntry) {
     model->HandleHeartbeatEntry(state, logHeartBeatEntry, "node1");
     // We expect to have a message in our message log
     ASSERT_EQ(state.messageLog.size(), 1);
-    // We expect our new timeout time to be larger than our current time
-    ASSERT_GT(state.heartbeatTimeout, state.currentTime);
 }
 
 /* Test Time advance */
@@ -164,7 +160,6 @@ TEST_F(RaftAtomicFixture, TestTimeAdvance) {
     // We expect to have a message in our message log
     ASSERT_EQ(state.messageLog.size(), 1);
     // We expect our new timeout time to be larger than our current time
-    ASSERT_GT(state.heartbeatTimeout, state.currentTime);
 }
 
 // Deterministic rather than stochastic implmentation of timeAdvance

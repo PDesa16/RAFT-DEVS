@@ -1,6 +1,5 @@
 #include <gtest/gtest.h>
 #include "../packet_processor.hpp"
-#include "../../messages/raft/raft_messages.hpp"
 
 
 class PacketProcessorAtomicFixture: public ::testing::Test
@@ -36,8 +35,8 @@ protected:
         ) ;
     
     
-        model -> in_packet -> addMessage(packet1);
-        model -> in_packet -> addMessage(packet2);
+        model -> input_packet -> addMessage(packet1);
+        model -> input_packet -> addMessage(packet2);
     };
 
 };

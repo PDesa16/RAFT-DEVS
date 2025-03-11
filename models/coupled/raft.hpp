@@ -2,9 +2,9 @@
 #define RAFT_HPP
 
 #include <cadmium/core/modeling/coupled.hpp>
-#include "../buffer.hpp" 
-#include "../raft_controller.hpp"
-#include "../heartbeat_controller.hpp"
+#include "../atomic/buffer.hpp" 
+#include "../atomic/raft_controller.hpp"
+#include "../atomic/heartbeat_controller.hpp"
 
 
 

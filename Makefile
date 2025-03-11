@@ -1,169 +1,116 @@
-build_debug:
-	# g++ -Wall -g --std=c++17 -c main.cpp -o bin/main.o
-	# g++ -Wall -g --std=c++17 -Ivendor/yaml-cpp/include -c config/config.cpp -o bin/config.o
-	g++ -Wall -g --std=c++17 -Wno-c++20-compat -Ivendor/cadmium/include -Ivendor/json/include -c models/ntp_model.cpp -o bin/ntp_model.o
-	# # g++ -Wall -g --std=c++17 -c ntp/ntp.cpp -o bin/ntp.o
-	# # g++ -Wall -g --std=c++17 -c ntp/messages.cpp -o bin/messages.o
+# Compiler and flags
+CXX = g++
+CXXFLAGS = -Wall -g --std=c++17 -pthread
 
+# Directories
+VENDOR_DIR = vendor
+INCLUDE_DIRS = -I$(VENDOR_DIR)/cadmium_v2/include \
+               -I$(VENDOR_DIR)/googletest/googletest/include \
+               -I$(VENDOR_DIR)/googletest/googlemock/include \
+               -I$(VENDOR_DIR)/cryptopp
 
-build_test_buffer:
-	g++ -Wall -g --std=c++17 \
-    -Ivendor/cadmium_v2/include \
-    -Ivendor/googletest/googletest/include \
-    -Ivendor/googletest/googlemock/include \
-    models/test/buffer_test.cpp \
-    vendor/googletest/lib/libgtest.a \
-    vendor/googletest/lib/libgtest_main.a \
-    -o bin/test_buffer \
-    -pthread
+LIB_DIRS = -L$(VENDOR_DIR)/googletest/lib -L$(VENDOR_DIR)/cryptopp
 
-build_test_database:
-	g++ -Wall -g --std=c++17 \
-    -Ivendor/cadmium_v2/include \
-    -Ivendor/googletest/googletest/include \
-    -Ivendor/googletest/googlemock/include \
-    models/test/database_test.cpp \
-    vendor/googletest/lib/libgtest.a \
-    vendor/googletest/lib/libgtest_main.a \
-    -o bin/test_database \
-    -pthread
+GTEST_LIBS = $(VENDOR_DIR)/googletest/lib/libgtest.a \
+             $(VENDOR_DIR)/googletest/lib/libgtest_main.a
 
-build_test_raft:
-	g++ -Wall -g --std=c++17 \
-    -Ivendor/cadmium_v2/include \
-    -Ivendor/googletest/googletest/include \
-    -Ivendor/googletest/googlemock/include \
-    -Ivendor/cryptopp \
-    models/test/raft_test.cpp \
-    utils/cryptography/crypto.cpp \
-    utils/stochastic/random.cpp \
-    vendor/googletest/lib/libgtest.a \
-    vendor/googletest/lib/libgtest_main.a \
-    vendor/cryptopp/libcryptopp.a \
-    -o bin/test_raft \
-    -pthread
+CRYPTOPP_LIBS = $(VENDOR_DIR)/cryptopp/libcryptopp.a
+
+BIN_DIR = bin
+SRC_DIR = models
+UTILS_DIR = utils
+
+# Test targets
+TESTS = test_buffer test_network \
+        test_raft test_packet_processor test_message_processor \
+        test_node test_heartbeat_controller test_simulation test_raft_controller
+
+# Build and run all tests
+all: $(TESTS) run_tests
+
+build_test_raft_controller:
+	$(CXX) $(CXXFLAGS) $(INCLUDE_DIRS) $(SRC_DIR)/atomic/test/raft_test.cpp \
+		$(UTILS_DIR)/cryptography/crypto.cpp $(UTILS_DIR)/stochastic/random.cpp \
+		$(GTEST_LIBS) $(CRYPTOPP_LIBS) -o $(BIN_DIR)/test_raft_controller $(LIB_DIRS)
 
 build_test_network:
-	g++ -Wall -g --std=c++17 \
-    -Ivendor/cadmium_v2/include \
-    -Ivendor/googletest/googletest/include \
-    -Ivendor/googletest/googlemock/include \
-    -Ivendor/cryptopp \
-    models/test/network_test.cpp \
-    utils/stochastic/random.cpp \
-    vendor/googletest/lib/libgtest.a \
-    vendor/googletest/lib/libgtest_main.a \
-    vendor/cryptopp/libcryptopp.a \
-    -o bin/test_network \
-    -pthread
-
-build_test_buffer_raft:
-	g++ -Wall -g --std=c++17 \
-    -Ivendor/cadmium_v2/include \
-    -Ivendor/googletest/googletest/include \
-    -Ivendor/googletest/googlemock/include \
-    -Ivendor/cryptopp \
-    models/coupled/test/buffer_raft_test.cpp \
-    utils/cryptography/crypto.cpp \
-    utils/stochastic/random.cpp \
-    vendor/googletest/lib/libgtest.a \
-    vendor/googletest/lib/libgtest_main.a \
-    vendor/cryptopp/libcryptopp.a \
-    -o bin/test_buffer_raft \
-    -pthread
+	$(CXX) $(CXXFLAGS) $(INCLUDE_DIRS) $(SRC_DIR)/atomic/test/network_test.cpp \
+		$(UTILS_DIR)/stochastic/random.cpp $(GTEST_LIBS) $(CRYPTOPP_LIBS) -o $(BIN_DIR)/test_network $(LIB_DIRS)
 
 build_packet_processor_raft:
-	g++ -Wall -g --std=c++17 \
-    -Ivendor/cadmium_v2/include \
-    -Ivendor/googletest/googletest/include \
-    -Ivendor/googletest/googlemock/include \
-    -Ivendor/cryptopp \
-    models/test/packet_processor_test.cpp \
-    utils/cryptography/crypto.cpp \
-    utils/stochastic/random.cpp \
-    vendor/googletest/lib/libgtest.a \
-    vendor/googletest/lib/libgtest_main.a \
-    vendor/cryptopp/libcryptopp.a \
-    -o bin/test_packet_processor \
-    -pthread
-
+	$(CXX) $(CXXFLAGS) $(INCLUDE_DIRS) $(SRC_DIR)/atomic/test/packet_processor_test.cpp \
+		$(UTILS_DIR)/cryptography/crypto.cpp $(UTILS_DIR)/stochastic/random.cpp \
+		$(GTEST_LIBS) $(CRYPTOPP_LIBS) -o $(BIN_DIR)/test_packet_processor $(LIB_DIRS)
 
 build_message_processor_raft:
-	g++ -Wall -g --std=c++17 \
-    -Ivendor/cadmium_v2/include \
-    -Ivendor/googletest/googletest/include \
-    -Ivendor/googletest/googlemock/include \
-    -Ivendor/cryptopp \
-    models/test/message_processor_test.cpp \
-    utils/cryptography/crypto.cpp \
-    utils/stochastic/random.cpp \
-    vendor/googletest/lib/libgtest.a \
-    vendor/googletest/lib/libgtest_main.a \
-    vendor/cryptopp/libcryptopp.a \
-    -o bin/test_message_processor \
-    -pthread
-
-
+	$(CXX) $(CXXFLAGS) $(INCLUDE_DIRS) $(SRC_DIR)/atomic/test/message_processor_test.cpp \
+		$(UTILS_DIR)/cryptography/crypto.cpp $(UTILS_DIR)/stochastic/random.cpp \
+		$(GTEST_LIBS) $(CRYPTOPP_LIBS) -o $(BIN_DIR)/test_message_processor $(LIB_DIRS)
 
 build_node:
-	g++ -Wall -g --std=c++17 \
-    -Ivendor/cadmium_v2/include \
-    -Ivendor/googletest/googletest/include \
-    -Ivendor/googletest/googlemock/include \
-    -Ivendor/cryptopp \
-    models/coupled/test/node_test.cpp \
-    utils/cryptography/crypto.cpp \
-    utils/stochastic/random.cpp \
-    vendor/googletest/lib/libgtest.a \
-    vendor/googletest/lib/libgtest_main.a \
-    vendor/cryptopp/libcryptopp.a \
-    -o bin/test_node \
-    -pthread
-
+	$(CXX) $(CXXFLAGS) $(INCLUDE_DIRS) $(SRC_DIR)/coupled/test/node_test.cpp \
+		$(UTILS_DIR)/cryptography/crypto.cpp $(UTILS_DIR)/stochastic/random.cpp \
+		$(GTEST_LIBS) $(CRYPTOPP_LIBS) -o $(BIN_DIR)/test_node $(LIB_DIRS)
 
 build_simulation:
-	g++ -Wall -g --std=c++17 \
-    -Ivendor/cadmium_v2/include \
-    -Ivendor/googletest/googletest/include \
-    -Ivendor/googletest/googlemock/include \
-    -Ivendor/cryptopp \
-    models/coupled/test/simulation_test.cpp \
-    utils/cryptography/crypto.cpp \
-    utils/stochastic/random.cpp \
-    vendor/googletest/lib/libgtest.a \
-    vendor/googletest/lib/libgtest_main.a \
-    vendor/cryptopp/libcryptopp.a \
-    -o bin/test_simulation \
-    -pthread
-
+	$(CXX) $(CXXFLAGS) $(INCLUDE_DIRS) $(SRC_DIR)/coupled/test/simulation_test.cpp \
+		$(UTILS_DIR)/cryptography/crypto.cpp $(UTILS_DIR)/stochastic/random.cpp \
+		$(GTEST_LIBS) $(CRYPTOPP_LIBS) -o $(BIN_DIR)/test_simulation $(LIB_DIRS)
 
 build_heartbeat_controller:
-	g++ -Wall -g --std=c++17 \
-    -Ivendor/cadmium_v2/include \
-    -Ivendor/googletest/googletest/include \
-    -Ivendor/googletest/googlemock/include \
-    -Ivendor/cryptopp \
-    models/test/heartbeat_controller_test.cpp \
-    utils/cryptography/crypto.cpp \
-    utils/stochastic/random.cpp \
-    vendor/googletest/lib/libgtest.a \
-    vendor/googletest/lib/libgtest_main.a \
-    vendor/cryptopp/libcryptopp.a \
-    -o bin/test_simulation \
-    -pthread
-
+	$(CXX) $(CXXFLAGS) $(INCLUDE_DIRS) $(SRC_DIR)/atomic/test/heartbeat_controller_test.cpp \
+		$(UTILS_DIR)/cryptography/crypto.cpp $(UTILS_DIR)/stochastic/random.cpp \
+		$(GTEST_LIBS) $(CRYPTOPP_LIBS) -o $(BIN_DIR)/test_heartbeat_controller $(LIB_DIRS)
 
 build_raft:
-	g++ -Wall -g --std=c++17 \
-    -Ivendor/cadmium_v2/include \
-    -Ivendor/googletest/googletest/include \
-    -Ivendor/googletest/googlemock/include \
-    -Ivendor/cryptopp \
-    models/coupled/test/raft_test.cpp \
-    utils/cryptography/crypto.cpp \
-    utils/stochastic/random.cpp \
-    vendor/googletest/lib/libgtest.a \
-    vendor/googletest/lib/libgtest_main.a \
-    vendor/cryptopp/libcryptopp.a \
-    -o bin/test_simulation \
-    -pthread
+	$(CXX) $(CXXFLAGS) $(INCLUDE_DIRS) $(SRC_DIR)/coupled/test/raft_test.cpp \
+		$(UTILS_DIR)/cryptography/crypto.cpp $(UTILS_DIR)/stochastic/random.cpp \
+		$(GTEST_LIBS) $(CRYPTOPP_LIBS) -o $(BIN_DIR)/test_raft $(LIB_DIRS)
+
+build_buffer:
+	$(CXX) $(CXXFLAGS) $(INCLUDE_DIRS) $(SRC_DIR)/atomic/test/buffer_test.cpp \
+		$(UTILS_DIR)/cryptography/crypto.cpp $(UTILS_DIR)/stochastic/random.cpp \
+		$(GTEST_LIBS) $(CRYPTOPP_LIBS) -o $(BIN_DIR)/test_buffer $(LIB_DIRS)
+
+
+# Run all tests
+run_tests: $(addprefix run_, $(TESTS))
+
+run_test_buffer:
+	$(BIN_DIR)/test_buffer
+
+run_test_raft_controller:
+	$(BIN_DIR)/test_raft_controller
+
+run_test_network:
+	$(BIN_DIR)/test_network
+
+run_test_raft:
+	$(BIN_DIR)/test_raft
+
+run_test_packet_processor:
+	$(BIN_DIR)/test_packet_processor
+
+run_test_message_processor:
+	$(BIN_DIR)/test_message_processor
+
+run_test_node:
+	$(BIN_DIR)/test_node
+
+run_test_simulation:
+	$(BIN_DIR)/test_simulation
+
+run_test_heartbeat_controller:
+	$(BIN_DIR)/test_heartbeat_controller
+
+run_test_raft:
+	$(BIN_DIR)/test_raft
+
+.PHONY: all $(TESTS) run_tests
+
+clean:
+	rm -rf $(BIN_DIR)/*
+
+build_all: build_test_raft_controller build_test_network build_packet_processor_raft \
+           build_message_processor_raft build_node build_simulation build_heartbeat_controller \
+           build_raft build_buffer

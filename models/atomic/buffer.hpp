@@ -5,7 +5,7 @@
 #include <queue>
 #include <string>
 #include <vector>
-#include "../utils/stochastic/random.hpp"
+#include "../../utils/stochastic/random.hpp"
 
 
 using namespace cadmium;

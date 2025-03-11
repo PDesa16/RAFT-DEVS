@@ -1,6 +1,5 @@
 #include <gtest/gtest.h>
 #include "../message_processor.hpp"
-#include "../../messages/raft/raft_messages.hpp"
 
 
 class MessageProcessorAtomicFixture: public ::testing::Test
