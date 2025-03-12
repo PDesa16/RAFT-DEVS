@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 #include "../simulation.hpp"
+#include "../../../logger/raft_logger.hpp"
 #include <cadmium/core/simulation/root_coordinator.hpp>
 
 
@@ -27,8 +28,10 @@ protected:
 TEST_F(SimulationFixture, testBuildBufferRaftCoupledModel) {
     // Create a RootCoordinator to manage the simulation
     // Instantiate the top-level coupled model
+    auto logger = std::make_shared<RAFTLogger>();
     auto model = std::make_shared<SimulationModel>("simulation");
     RootCoordinator root(model);
+    root.setLogger(logger);
     // Set the simulation time limit (e.g., 1000 time units)
     root.simulate(0.3);
     ASSERT_TRUE(model != nullptr);
