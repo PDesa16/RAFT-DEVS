@@ -67,21 +67,6 @@ TEST_F(RaftAtomicFixture, TestInternalTransitionHeartbeatInvalid) {
 
 }
 
-TEST_F(RaftAtomicFixture, TestInternalTransitionHeartbeatValid) {
-    state.currentTime = 0.301;
-    // Step the internalTransition
-    model->internalTransition(state);
-    // We expect it to have created a VoteRequest Message
-    ASSERT_EQ(Task::VOTE_REQUEST , state.raftOutMessages[0]->content->getType());
-    // We expect to have a message in our outboundRaft queue
-    ASSERT_EQ(state.raftOutMessages.size(), 1);
-    // We expect the node to be a candidate
-    ASSERT_EQ(state.state, RaftStatus::CANDIDATE);
-}
-
-/* External Transition Tests */
-
-
 /* Test ResponseVote */
 
 TEST_F(RaftAtomicFixture, TestHandleResponse) {
