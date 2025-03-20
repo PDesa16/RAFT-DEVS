@@ -53,18 +53,18 @@ make run_test_buffer
 make run_test_raft_controller
 make run_test_network
 make run_test_raft
-make run_packet_processor_raft
-make run_message_processor_raft
-make run_node
-make run_simulation
-make run_heartbeat_controller
-make run_raft
+make run_test_packet_processor_raft
+make run_test_message_processor_raft
+make run_test_node
+make run_test_simulation
+make run_test_heartbeat_controller
+make run_test_raft
 ```
 
 ## Running the Simulation
 To run the simulation test, execute:
 ```sh
-make run_simulation
+make run_test_simulation
 ```
 
 ## Cleaning Up
