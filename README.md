@@ -6,6 +6,16 @@ To clone this repository along with its submodules, run:
 git clone --recurse-submodules https://github.com/PDesa16/RAFT-DEVS
 ```
 
+## Traverse to Project Directory
+```sh
+cd RAFT-DEVS
+```
+## Give Permissions to the Build Script
+```sh
+chmod 755 build_script.sh
+```
+
+
 ## Building Dependencies
 Before building the project, install the necessary dependencies by running:
 ```sh
